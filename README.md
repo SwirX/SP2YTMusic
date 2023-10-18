@@ -10,6 +10,8 @@ This projects aims to provide a way to migrate all your playlists from spotify t
     
     ` pip install ytmusicapi`
 
+3. setup spotify app
+
 ## customization
 
 
