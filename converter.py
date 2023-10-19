@@ -2,12 +2,25 @@ import time
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 import json
+import os
+import ytmusicapi
+from ytmusicapi import YTMusic
 
 credentials = {}
 with open("credentials.json") as json_file:
     credentials = json.load(json_file)
-    
-if(credentials != {}):
+
+ytmusic = 0
+
+if(not os.path.isfile("oauth.json")):
+    print("generating youtube api tokens")
+    oauth = ytmusicapi.setup_oauth(open_browser = True)
+    with open("oauth.json", "w") as json_file:
+        json_file.write(json.dumps(oauth, indent=4))
+
+ytmusic = YTMusic("oauth.json")
+
+if(credentials != {} or ytmusic == 0):
     start_time = time.time()
 
     scope = "user-library-read"
@@ -78,7 +91,7 @@ if(credentials != {}):
         playlists.append({
             "name" : "your favorites from spotify",
             "description" : "this playlist contains all your liked songs from spotify",
-            "id": "",
+            "id": "favs",
             "songs": favs
         })
     
@@ -88,5 +101,39 @@ if(credentials != {}):
         total_songs += len(playlist["songs"])
     print("fetched", len(playlists), "playlists containing a total of", total_songs, "songs in", time.time()-start_time, "s!")
   
+    # create new playlists in youtube music
+    yt_playlists = []
+    print("Looking for all your spotify songs on youtube, this may take a while..")
+    start_time = time.time()
+    # replace all query strings with corresponding yt music ids
+    for playlist in playlists:
+        song_ids = []
+        progress = 0
+        print("fetching yt music ids for songs in", playlist["name"])
+        for song_title in playlist["songs"]:
+            song_id = ytmusic.search(song_title, limit = 1, filter = "songs")[0]["videoId"]
+            song_ids.append(song_id)
+            progress += 1
+            if(progress % 10 == 0):
+                print(progress, "/", len(playlist["songs"]))
+        yt_playlists.append(playlist)
+        yt_playlists[-1]["songs"] = song_ids
+    print("Fetched songs ids from all songs in", time.time()-start_time, "s!")
+    print("Creating all playlists in yt music.")
+
+    for playlist in yt_playlists:
+        ytmusic.create_playlist(
+            playlist["name"],
+            playlist["description"],
+            video_ids = playlist["songs"]
+        )
+        print("Created playlist", playlist["name"])
+        if(playlist["id"]=="favs"):
+            print("Do you want me to like all the songs in your 'favorite songs' playlist, so that they appear in youtube's automatically generated playlist?")
+            input = input("enter 'y' for yes, anything else for no")
+            if(input in ["y", "Y", "yes", "Yes"]):
+                for song in playlist["songs"]:
+                    ytmusic.rate_song(song, "LIKE")
+
 else:
     print("error loading credentials")

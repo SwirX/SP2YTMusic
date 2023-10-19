@@ -12,10 +12,12 @@ This projects aims to provide a way to migrate all your playlists from spotify t
 
 3. setup spotify app
 
+4. create youtube oauth.json file
+
 ## customization
 
 
 ## dependencies
 spotipy 
-
+ytmusicapi
 
