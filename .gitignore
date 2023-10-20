@@ -1,3 +1,5 @@
 credentials.json
 .cache
 oauth.json
+spotify_playlists.json
+yt_playlists.json
