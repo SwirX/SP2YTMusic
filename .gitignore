@@ -3,3 +3,5 @@ credentials.json
 oauth.json
 spotify_playlists.json
 yt_playlists.json
+not_found_songs.json
+remaining.json
