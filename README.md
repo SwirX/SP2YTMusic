@@ -1,15 +1,29 @@
 # SPT2YTM - Spotify to YouTube Music Playlist Converter
 This project provides a way to migrate all of your playlists from Spotify to YouTube Music.
 
+## Table of Contents
+
+- [Installation](#installation)
+    - [Windows](#windows)
+    - [Linux](#linux)
+- [Quick start guide](#quick-start-guide)
+    - [YouTube Music API tokens](#youtube-music)
+    - [Spotify API tokens](#spotify)
+- [Rerunning SPT2YTM](#rerunning-spt2ytm)
+- [Limitations](#limitations)
+- [Dependencies](#dependencies)
+
 ## Installation
 
 ### Windows
 
-You **only** need to download the file [converter.exe]() from the folder `dist/`. Make sure to put it in its own folder before executing it, as it generates some extra files.
+You **only** need to download the file [converter.exe](https://github.com/GRhOGS/SPT2YTM/raw/main/dist/converter.exe) from the folder `dist/`. Make sure to put it in its own folder before executing it, as it generates some extra files.
 
 If you don't trust the executable, follow along with the linux section. If you additionaly want to create your own executable, install [pyinstaller](https://pyinstaller.org/en/stable/installation.html), open a command prompt, navigate to the folder containing `converter.py` and run the command
 
-`pyinstaller -c -F -i media/icon.ico --collect-all ytmusicapi converter.py`
+```bash
+pyinstaller -c -F -i media/icon.ico --collect-all ytmusicapi converter.py
+```
 
 ### Linux
 
@@ -17,17 +31,23 @@ If you don't trust the executable, follow along with the linux section. If you a
 
 2. Install [spotipy](https://spotipy.readthedocs.io/en/latest/#installation) :
     
-    `pip install spotipy --upgrade`
+```bash
+pip install spotipy --upgrade
+```
 
 3. Install [ytmusicapi](https://ytmusicapi.readthedocs.io/en/latest/setup/index.html) :
     
-    `pip install ytmusicapi`
+```bash
+pip install ytmusicapi
+```
 
 4. Navigate to the download directory of this repo and run
 
-    `python3 converter.py`
+```bash
+python3 converter.py
+```
 
-## Usage
+## Quick start guide
 
 To use SPT2YTM, simply open `converter.exe` if you're on windows, or run `python3 converter.py` once you completed all steps for the linux installation. When SPT2YTM runs for the first time, you need to provide API tokens for both YouTube Music and Spotify. Keep in mind, to never share these tokens with other people you don't trust, because they basically function as a username/password combination for your Spotify and YouTube accounts. Here is how you get them:
 
@@ -38,7 +58,7 @@ When SPT2YTM asks you for your YouTube api tokens and a browser window pops up, 
 
 After getting your YouTube tokens, SPY2YTM will ask you to provide a Spotify client id and client secret. The process for getting those tokens from spotify is a bit tricky, here is how to get them: 
 
-First, in your browser, you need to navigate to the [Spotify developer dashboard](https://developer.spotify.com/dashboard). Once you're logged into your Spotify account and on the dashbaord, click the "Create App" button on the top right. You then need to enter some details:
+First, in your browser, you need to navigate to the <a href="https://developer.spotify.com/dashboard" target="_blank">Spotify developer dashboard</a>. Once you're logged into your Spotify account and on the dashbaord, click the "Create App" button on the top right. You then need to enter some details:
 
 - App name: get my music
 - App description: gets my music
