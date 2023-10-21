@@ -1,10 +1,12 @@
-import time
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
 import json
 import os
 import ytmusicapi
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 from ytmusicapi import YTMusic
+from time import time
+from time import sleep
+from functools import reduce
 
 def get_all_spotify_songs_from_query_result(items):
     output = []
@@ -16,7 +18,7 @@ def get_all_spotify_songs_from_query_result(items):
             output.append(title)
     return output
 
-def find_all_spotify_songs_in_playlist(playlist_id):
+def find_all_spotify_songs_in_playlist(playlist_id, sp):
     songs = []
     found_all = False
     offset = 0
@@ -33,7 +35,7 @@ def find_favorite_spotify_songs(sp):
     found_all = False
     favs = []
     offset = 0
-    print("fetching favorites...")
+    print("fetching favorites (this may take a while)...")
     while(found_all == False):
         result = sp.current_user_saved_tracks(offset = offset, limit = 50)['items']
         favs.extend(get_all_spotify_songs_from_query_result(result))
@@ -53,11 +55,12 @@ def find_all_spotify_playlists(sp):
     found_all = False
     offset = 0
     spotify_playlists = []
+    spotify_playlists.append(find_favorite_spotify_songs(sp))
     while(found_all == False):
         result = sp.current_user_playlists(limit=50, offset=offset)
         for item in result['items']:
             print("fetching playlist", item["name"], "...")
-            songs = find_all_spotify_songs_in_playlist(item["id"])
+            songs = find_all_spotify_songs_in_playlist(item["id"], sp)
             spotify_playlists.append({
                 "name" : item["name"],
                 "description": item["description"],
@@ -66,7 +69,6 @@ def find_all_spotify_playlists(sp):
         offset += 50
         if(result["items"]==[]):
             found_all = True
-    spotify_playlists.append(find_favorite_spotify_songs(sp))
     print(len(spotify_playlists), "playlists found!")
     return spotify_playlists
 
@@ -74,18 +76,20 @@ def get_all_ytm_ids(spotify_playlists):
     output = []
     not_found_songs = []
     found_songs = {}
-    print("Looking for all your spotify songs on youtube, this may take a while..")
-    start_time = time.time()
+    print("Looking for all your Spotify songs on YouTube Music. This will take about", 
+        int(reduce(lambda x,y: x+y, map(lambda x: len(x["songs"]), spotify_playlists))*0.005),
+        "minutes to complete.")
+    start_time = time()
     # replace all query strings with corresponding yt music ids
     for playlist in spotify_playlists:
         song_ids = []
         not_found = []
-        progress = -1
+        progress = 0
 
-        print("Fetching yt music ids for songs in", playlist["name"])
+        print("Fetching YouTube Music song IDs for songs in:", playlist["name"])
         for song_title in playlist["songs"]:
             progress += 1
-            if(progress % 10 == 0):
+            if(progress % 10 == 0 or progress == len(playlist["songs"])):
                 print(progress, "/", len(playlist["songs"]))
 
             # skip query if song has been searched before
@@ -110,21 +114,30 @@ def get_all_ytm_ids(spotify_playlists):
         output[-1]["songs"] = song_ids
 
     print("Done fetching all", len(found_songs.keys()), "individual songs.")
-    print("Fetched songs ids from all songs in", time.time()-start_time, "s!")
+    print("Fetched song IDs from all songs in", time()-start_time, "s.")
     if(not_found_songs != []):
         with open("not_found_songs.json", "w") as json_file:
             json_file.write(json.dumps(not_found_songs, indent=4))
     return output
 
 def like_all_songs(songs):
-    print("Do you want me to like all the songs in your 'favorite songs' playlist, so that they appear in youtube's automatically generated playlist?")
-    input = input("enter 'y' for yes, anything else for no")
-    if(input in ["y", "Y", "yes", "Yes"]):
-        for song in songs:
-            ytmusic.rate_song(song, "LIKE")
+    print("Do you want me to like all the songs in your 'favorite songs' playlist, so that they appear in YouTubes automatically generated playlist?")
+    print("This will take a while, since YouTube has restrictions regarding how fast you can like songs.")
+    confirmation = input("Enter 'y' for yes, anything else for no: ")
+    if(confirmation in ["y", "Y", "yes", "Yes"]):
+        counter = 1
+        for song in songs[::-1]:
+            counter += 1
+            if(counter % 20 == 0 or counter == len(songs)):
+                print(counter, "/", len(songs))
+            response_check = ytmusic.rate_song(song, "LIKE")["actions"][0]["addToToastAction"]["item"]["notificationActionRenderer"]["responseText"]["runs"][0]["text"]
+            while(response_check != "Saved to liked songs"):
+                sleep(1)
+                response_check = ytmusic.rate_song(song, "LIKE")["actions"][0]["addToToastAction"]["item"]["notificationActionRenderer"]["responseText"]["runs"][0]["text"]
 
-def create_all_playlists(playlists):
-    print("Creating all playlists in yt music.")
+def create_all_playlists(playlists_in, ytmusic):
+    print("Creating YouTube Music playlists. You're almost done!")
+    playlists = playlists_in[::-1] # reverse playlist, so that the oldest playlist is created first
     i = 0
     while i < len(playlists):
         playlist = playlists[i]
@@ -134,34 +147,58 @@ def create_all_playlists(playlists):
                 playlist["description"],
                 video_ids = playlist["songs"]
             )
-            print("Created playlist", playlist["name"])
+            print("Created playlist", playlist["name"] + ".")
             if(playlist["name"]=="your favorites from spotify"):
                 like_all_songs(playlist["songs"])
             i+=1
-        except:
-            print("You tried to create too many playlists, yt music only allows you to create 25 playlists every 6h.")
+        except Exception as error:
+            print("An error accured:", error)
+            print("If you see this, it is very likely, that you tried to create too many playlists too quickly.")
+            print("YouTube Music only allows you to create 25 playlists every 6h.")
             with open("remaining.json", "w") as json_file:
-                json_file.write(json.dumps(yt_playlists[i:], indent=4))
+                json_file.write(json.dumps(playlists[i:], indent=4))
             print("To add the remaining playlists, just rerun this program in 6h. The remaining playlists are saved in the file remaining.json")
             i = len(yt_playlists)
+        else:
+            # empty remaining.json file
+            with open("remaining.json", "w") as json_file:
+                json_file.write(json.dumps([], indent=4))
 
 def print_not_added_songs():
     if(os.path.isfile("not_found_songs.json")):
         with open("not_found_songs.json") as json_file:
             not_found_songs = json.load(json_file)
-            print("Couldnt find the following song:")
+            print("Couldn't find the following song:")
             for playlist in not_found_songs:
                 for playlist_name, songs in playlist.items():
                     print("-----", playlist_name, "-----")
                     for song in songs:
                         print("-", song)
-        print("This has been saved for later use in the file not_found_songs.json")
+        print("This has also been saved for later use in the file not_found_songs.json")
 
 # --------------
 # PROGRAMM START
 # --------------
 
-total_time = time.time()
+print("""
+███████╗██████╗ ████████╗██████╗ ██╗   ██╗████████╗███╗   ███╗
+██╔════╝██╔══██╗╚══██╔══╝╚════██╗╚██╗ ██╔╝╚══██╔══╝████╗ ████║
+███████╗██████╔╝   ██║    █████╔╝ ╚████╔╝    ██║   ██╔████╔██║
+╚════██║██╔═══╝    ██║   ██╔═══╝   ╚██╔╝     ██║   ██║╚██╔╝██║
+███████║██║        ██║   ███████╗   ██║      ██║   ██║ ╚═╝ ██║
+╚══════╝╚═╝        ╚═╝   ╚══════╝   ╚═╝      ╚═╝   ╚═╝     ╚═╝
+""")
+print("Welcome to SPT2YTM, the Spotify to YouTube Music converter.")
+total_time = time()
+
+# get or generate yt music credentials
+print("Getting YouTube Music credentials...")
+if(not os.path.isfile("oauth.json")):
+    print("Generating YouTube API tokens, please follow the instructions:")
+    oauth = ytmusicapi.setup_oauth(open_browser = True)
+    with open("oauth.json", "w") as json_file:
+        json_file.write(json.dumps(oauth, indent=4))
+ytmusic = YTMusic("oauth.json")
 
 # skip fetching playlists if they have already been fetched
 if(os.path.isfile("remaining.json") or os.path.isfile("yt_playlists.json")):
@@ -174,19 +211,9 @@ if(os.path.isfile("remaining.json") or os.path.isfile("yt_playlists.json")):
         with open("yt_playlists.json") as json_file:
                 yt_playlists = json.load(json_file)
                 print("Loaded yt music playlists from file.")        
-    create_all_playlists(yt_playlists)
+    create_all_playlists(yt_playlists, ytmusic)
 else:   # start fetching needed data
-    # get or generate yt music credentials
-    print("Getting yt music credentials...")
-    if(not os.path.isfile("oauth.json")):
-        print("generating youtube api tokens, please follow the instructions:")
-        oauth = ytmusicapi.setup_oauth(open_browser = True)
-        with open("oauth.json", "w") as json_file:
-            json_file.write(json.dumps(oauth, indent=4))
-    ytmusic = YTMusic("oauth.json")
-
-    start_time = time.time()
-
+    start_time = time()
     # get all the users playlists from spotify
     print("Finding all playlists on spotify...")
     playlists = []
@@ -197,8 +224,22 @@ else:   # start fetching needed data
     else:
         print("Getting spotify credentials...")
         credentials = {}
-        with open("credentials.json") as json_file:
-            credentials = json.load(json_file)
+        if(os.path.isfile("credentials.json")):
+            with open("credentials.json") as json_file:
+                credentials = json.load(json_file)
+        else:
+            # create spotify credentials file
+            print("Creating spotify credentials file. If you don't know where to find your spotify client id and client secret, please check the readme.md file.")
+            print("Please enter the following from your app in the developer dashboard:")
+            client_id = input("Enter your client id:")
+            client_secret = input("Enter your client secret:")
+            credentials = {
+                "spotify_client_id": client_id,
+                "spotify_client_secret": client_secret
+            }
+            with open("credentials.json", "w") as json_file:
+                json_file.write(json.dumps(credentials, indent=4))
+
         sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
                             scope = "user-library-read",
                             client_id = credentials["spotify_client_id"],
@@ -206,19 +247,19 @@ else:   # start fetching needed data
                             redirect_uri = "http://localhost:3000"))
 
         playlists = find_all_spotify_playlists(sp)
-        print("Finished fetching all playlists from spotify!")
-        total_songs=0
-        for playlist in playlists:
-            total_songs += len(playlist["songs"])
-        print("Fetched", len(playlists), "playlists containing a total of", total_songs, "songs in", time.time()-start_time, "s.")
         with open("spotify_playlists.json", "w") as json_file:
                 json_file.write(json.dumps(playlists, indent=4))
+        print("Finished fetching all playlists from spotify!")
+        print("Fetched", len(playlists), "playlists containing a total of", 
+            reduce(lambda x,y: x+y, map(lambda x: len(x["songs"]), playlists)),
+            "songs in", time()-start_time, "s.")
 
     # create new playlists in youtube music
     yt_playlists = get_all_ytm_ids(playlists)
     with open("yt_playlists.json", "w") as json_file:
         json_file.write(json.dumps(yt_playlists, indent=4))
-    create_all_playlists(yt_playlists)
+    create_all_playlists(yt_playlists, ytmusic)
     print_not_added_songs()
 
-print("Finished in", time.time() - total_time, "s.")
+print("Finished in", time() - total_time, "s.")
+input("Press enter to close this programm.")

@@ -1,23 +1,66 @@
-# spotify to yt music migration tool
-This projects aims to provide a way to migrate all your playlists from spotify to youtube music.
+# SPT2YTM - Spotify to YouTube Music Playlist Converter
+This project provides a way to migrate all of your playlists from Spotify to YouTube Music.
 
-## installation/usage
-1. install [spotipy](https://spotipy.readthedocs.io/en/latest/#installation) :
+## Installation
+
+### Windows
+
+You **only** need to download the file [converter.exe]() from the folder `dist/`. Make sure to put it in its own folder before executing it, as it generates some extra files.
+
+If you don't trust the executable, follow along with the linux section. If you additionaly want to create your own executable, install [pyinstaller](https://pyinstaller.org/en/stable/installation.html), open a command prompt, navigate to the folder containing `converter.py` and run the command
+
+`pyinstaller -c -F -i media/icon.ico --collect-all ytmusicapi converter.py`
+
+### Linux
+
+1. Download this github project.
+
+2. Install [spotipy](https://spotipy.readthedocs.io/en/latest/#installation) :
     
     `pip install spotipy --upgrade`
 
-2. install [ytmusicapi](https://ytmusicapi.readthedocs.io/en/latest/setup/index.html) :
+3. Install [ytmusicapi](https://ytmusicapi.readthedocs.io/en/latest/setup/index.html) :
     
     `pip install ytmusicapi`
 
-3. setup spotify app
+4. Navigate to the download directory of this repo and run
 
-4. create youtube oauth.json file
+    `python3 converter.py`
 
-## limitations
-YouTubes API only allows regular users to create 25 playlists every 6 hours. For that purpose, the program creates a file `yt_playlists.json` which contains all playlists in `.json format`. If you can't create all your playlists in one go, you can edit this file and remove the playlists which have been created sucessfully earlier. Alternatively, the program asks you if you want to wait for the 6 hours before continuing. The downside being, that you need to keep your computer turned on for the 6 hours.
+## Usage
 
-## dependencies
-spotipy 
-ytmusicapi
+To use SPT2YTM, simply open `converter.exe` if you're on windows, or run `python3 converter.py` once you completed all steps for the linux installation. When SPT2YTM runs for the first time, you need to provide API tokens for both YouTube Music and Spotify. Keep in mind, to never share these tokens with other people you don't trust, because they basically function as a username/password combination for your Spotify and YouTube accounts. Here is how you get them:
 
+### YouTube Music
+When SPT2YTM asks you for your YouTube api tokens and a browser window pops up, just follow the instructions in the browser and select the YouTube account you want to transfer your music to. After it tells you to "Continue on your device", you can close the browser tab and go back into the command prompt, proceeding by pressing the enter key.
+
+### Spotify
+
+After getting your YouTube tokens, SPY2YTM will ask you to provide a Spotify client id and client secret. The process for getting those tokens from spotify is a bit tricky, here is how to get them: 
+
+First, in your browser, you need to navigate to the [Spotify developer dashboard](https://developer.spotify.com/dashboard). Once you're logged into your Spotify account and on the dashbaord, click the "Create App" button on the top right. You then need to enter some details:
+
+- App name: get my music
+- App description: gets my music
+- Redirect URI: `http://localhost:3000`
+- [x] Web API
+
+You can set the apps name and description as whatever you want, it's not important what you call them, as long as they're not left empty. The important parts are that you copy and paste the Redirect URI `http://localhost:3000` and that you check the `Web API` option in the "Which API/SDKs are you planning to use?" section.
+
+After creating the app, it takes you to its dashboard. Here you need to click on the "Settings" button on the top right. On this page you can find the client id and client secret, which SPT2YTM needs. To view the client secret click the "View client secret" button, just under the client id field. Now just copy and paste both of them one by one into the command prompt and SPY2YTM should start doing its magic. Note, that you can paste content into the command prompt by simply right clicking inside of it, or pressing ctrl + v.
+
+If SPT2YTM crashes or doesn't function correctly at this point, check if the client id and client secret are stored correctly. You can check and edit them in the file `credentials.json`, which will be created in the same folder as the executable, when you run it for the first time.
+
+## Rerunning SPT2YTM
+
+If you want to rerun the searches or add the playlists again, simply delete all `.json` files except `oauth.json` and `credentials.json`, since those contain your API Tokens. Note, that fetching from Spotify gets skipped, if a file `remaining.json` or `yt_playlists.json` exists.
+
+## Limitations
+YouTube Music allows regular users to only create **25 playlists every 6 hours**. Because of that, SPT2YTM creates a file called `remaining.json`, once the maximum number of playlists are created. Once the 6 hours are passed, just rerun SPT2YTM and it will create the remaining playlists automatically, without going through the lengthy process of fetching all the songs again.
+
+The way of transfering a song from Spotify to YouTube Music still has room for improvement, because it simplay searches for the songs name + artist and picks the first result. 95% of the time it gets the right song, but it can happen that the song simply doesn't exist on YouTube Music. In that case, it simply gets the next best song fitting the name + artist criteria.
+
+## Dependencies
+- Python 3.11+
+- spotipy 
+- ytmusicapi

@@ -1,5 +1,7 @@
-credentials.json
+/build
+converter.spec
 .cache
+credentials.json
 oauth.json
 spotify_playlists.json
 yt_playlists.json
