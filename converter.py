@@ -194,7 +194,8 @@ total_time = time()
 # get or generate yt music credentials
 print("Getting YouTube Music credentials...")
 if(not os.path.isfile("oauth.json")):
-    print("Generating YouTube API tokens, please follow the instructions:")
+    print("Generating YouTube API tokens, please follow the instructions in the browser window, which will pop up shortly. After completion, continue here.")
+    sleep(10)
     oauth = ytmusicapi.setup_oauth(open_browser = True)
     with open("oauth.json", "w") as json_file:
         json_file.write(json.dumps(oauth, indent=4))

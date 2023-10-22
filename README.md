@@ -1,5 +1,5 @@
 # SPT2YTM - Spotify to YouTube Music Playlist Converter
-This project provides a way to migrate all of your playlists from Spotify to YouTube Music.
+This project provides a way to migrate all of your playlists from Spotify to YouTube Music. Although it is not as user friendly as other online tools that advertise to do the same job, it does not[*](#limitations) have a limit on how many songs you can convert.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ This project provides a way to migrate all of your playlists from Spotify to You
 
 ### Windows
 
-You **only** need to download the file [converter.exe](https://github.com/GRhOGS/SPT2YTM/raw/main/dist/converter.exe) from the folder `dist/`. Make sure to put it in its own folder before executing it, as it generates some extra files.
+You **only** need to download the file `converter.exe` (click [here](https://github.com/GRhOGS/SPT2YTM/raw/main/dist/converter.exe) to download) from the folder `dist/`. Make sure to put it in its own folder before running it, as it generates some extra files. Please make sure to read the [Quick start guide](#quick-start-guide) before running SPT2YTM, as it gives you a better idea on how to use it.
 
 If you don't trust the executable, follow along with the linux section. If you additionaly want to create your own executable, install [pyinstaller](https://pyinstaller.org/en/stable/installation.html), open a command prompt, navigate to the folder containing `converter.py` and run the command:
 
@@ -52,7 +52,7 @@ python3 converter.py
 To use SPT2YTM, simply open `converter.exe` if you're on windows, or run `python3 converter.py` once you completed all steps for the linux installation. When SPT2YTM runs for the first time, you need to provide API tokens for both YouTube Music and Spotify. Keep in mind, to never share these tokens with people you don't trust, because they basically function as a username/password combination for your Spotify and YouTube accounts. Here is how you get them:
 
 ### YouTube Music
-When SPT2YTM asks you for your YouTube api tokens and a browser window pops up, just follow the instructions in the browser and select the YouTube account you want to transfer your music to. After it tells you to "Continue on your device", you can close the browser tab and go back into the command prompt, proceeding by pressing the enter key.
+When SPT2YTM asks you for your YouTube api tokens and a browser window pops up, just follow the instructions in the browser and select the YouTube account you want to transfer your music to. After it tells you to "Continue on your device", you can close the browser tab and go back into the command prompt, **proceeding by pressing the enter key**.
 
 ### Spotify
 
@@ -63,7 +63,7 @@ First, in your browser, you need to navigate to the <a href="https://developer.s
 - App name: get my music
 - App description: gets my music
 - Redirect URI: `http://localhost:3000`
-- [x] Web API
+- Web API [x]
 
 You can set the apps name and description as whatever you want, it's not important what you call them, as long as they're not left empty. The important parts are that you copy and paste the Redirect URI `http://localhost:3000` and that you check the `Web API` option in the "Which API/SDKs are you planning to use?" section.
 
@@ -76,7 +76,7 @@ If SPT2YTM crashes or doesn't function correctly at this point, check if the cli
 If you want to rerun the searches or add the playlists again, simply delete all `.json` files except `oauth.json` and `credentials.json`, since those contain your API Tokens. Note, that fetching from Spotify gets skipped, if a file `remaining.json` or `yt_playlists.json` exists.
 
 ## Limitations
-YouTube Music allows regular users to only create **25 playlists every 6 hours**. Because of that, SPT2YTM creates a file called `remaining.json`, once the maximum number of playlists are created. Once the 6 hours are passed, just run SPT2YTM again and it will create the remaining playlists automatically, without going through the lengthy process of fetching all the songs again.
+YouTube Music allows all users to only create **25 playlists every 6 hours**. Because of that, SPT2YTM creates a file called `remaining.json`, once the maximum number of playlists are created. Once the 6 hours are passed, just run SPT2YTM again and it will create the remaining playlists automatically, without going through the lengthy process of fetching all the songs again.
 
 The way of transfering a song from Spotify to YouTube Music still has room for improvement, because it simply searches for the songs name + artist and picks the first result. 95% of the time it gets the right song, but it can happen that the song just doesn't exist on YouTube Music. In that case, it gets the next best song fitting the name + artist criteria.
 
