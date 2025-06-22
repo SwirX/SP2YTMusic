@@ -16,6 +16,9 @@ SPOTIFY_PLAYLISTS_FILE = "spotify_playlists.json"
 YT_PLAYLISTS_FILE = "yt_playlists.json"
 NOT_FOUND_FILE = "not_found_songs.json"
 REMAINING_FILE = "remaining.json"
+LIKED_CACHE_FILE = "liked_songs_cache.json"
+YT_ID_CACHE_FILE = "yt_id_cache.json"
+COMPLETED_PLAYLISTS_FILE = "completed_playlists.json"
 
 # ---------- UTILS ----------
 def load_json(path, default=None):
@@ -27,8 +30,8 @@ def load_json(path, default=None):
 def save_json(path, data):
     with open(path, 'w') as f:
         json.dump(data, f, indent=4)
-        
-def try_request(fn, retries=50, delay=2):
+
+def try_request(fn, retries=5, delay=2):
     for attempt in range(retries):
         try:
             return fn()
@@ -38,7 +41,6 @@ def try_request(fn, retries=50, delay=2):
                 sleep(delay * (attempt + 1))
             else:
                 raise e
-
 
 # ---------- SPOTIFY HELPERS ----------
 def get_all_spotify_songs_from_query_result(items):
@@ -52,12 +54,11 @@ def get_all_spotify_songs_from_query_result(items):
             songs.append(title)
     return songs
 
-
 def find_all_spotify_songs_in_playlist(playlist_id, sp):
     songs, offset = [], 0
     with tqdm(desc="Songs in playlist", unit="song", leave=False) as pbar:
         while True:
-            items = sp.playlist_items(playlist_id, limit=100, offset=offset).get("items", [])
+            items = try_request(lambda: sp.playlist_items(playlist_id, limit=100, offset=offset)).get("items", [])
             if not items:
                 break
             batch = get_all_spotify_songs_from_query_result(items)
@@ -66,16 +67,10 @@ def find_all_spotify_songs_in_playlist(playlist_id, sp):
             pbar.update(len(batch))
     return songs
 
-
 def find_favorite_spotify_songs(sp):
-    songs, offset = [], 0
-    cache = load_json("liked_songs_cache.json", [])
-    if cache:
-        songs = cache
-        offset = len(cache)
-        print(f"Resuming from liked song #{offset}")
-
-    print("Fetching liked tracks...")
+    songs = load_json(LIKED_CACHE_FILE, [])
+    offset = len(songs)
+    print("Fetching liked tracks... This may take a while.")
     with tqdm(desc="Liked songs", unit="song", initial=offset) as pbar:
         while True:
             items = try_request(lambda: sp.current_user_saved_tracks(limit=50, offset=offset)).get('items', [])
@@ -85,7 +80,7 @@ def find_favorite_spotify_songs(sp):
             songs.extend(batch)
             offset += 50
             pbar.update(len(batch))
-            save_json("liked_songs_cache.json", songs)
+            save_json(LIKED_CACHE_FILE, songs)
     if songs:
         return {"name": "Your Spotify Likes", "description": "All liked tracks", "songs": songs}
     return None
@@ -100,7 +95,7 @@ def find_all_spotify_playlists(sp):
     offset = 0
     all_items = []
     while True:
-        resp = sp.current_user_playlists(limit=50, offset=offset)
+        resp = try_request(lambda: sp.current_user_playlists(limit=50, offset=offset))
         items = resp.get('items', [])
         if not items:
             break
@@ -119,8 +114,7 @@ def find_all_spotify_playlists(sp):
 
 # ---------- YT MUSIC HELPERS ----------
 def get_all_ytm_ids(spotify_playlists, ytmusic):
-    cache = load_json("yt_id_cache.json", {})
-    found_cache = {}
+    found_cache = load_json(YT_ID_CACHE_FILE, {}) or {}
     output, missing = [], []
     total = sum(len(p['songs']) for p in spotify_playlists)
     print(f"Searching {total} songs on YouTube Music...")
@@ -129,18 +123,20 @@ def get_all_ytm_ids(spotify_playlists, ytmusic):
         not_found = []
         with tqdm(pl['songs'], desc=pl['name'], unit="song", leave=False) as pbar:
             for title in pl['songs']:
-                if title in cache:
-                    ids.append(cache[title])
+                if title in found_cache:
+                    song_id = found_cache[title]
+                    if song_id:
+                        ids.append(song_id)
                 else:
                     result = try_request(lambda: ytmusic.search(title, limit=1, filter='songs'))
                     if result:
-                        vid = result['videoId']
+                        vid = result[0]['videoId']
                         found_cache[title] = vid
-                        cache[title] = vid or None
-                        save_json("yt_id_cache.json", cache)
                         ids.append(vid)
                     else:
+                        found_cache[title] = None
                         not_found.append(title)
+                    save_json(YT_ID_CACHE_FILE, found_cache)
                 pbar.update(1)
         if not_found:
             missing.append({pl['name']: not_found})
@@ -149,44 +145,40 @@ def get_all_ytm_ids(spotify_playlists, ytmusic):
         save_json(NOT_FOUND_FILE, missing)
     return output
 
-
 def like_all_songs(songs, ytmusic):
     choice = input("Like all songs in your likes playlist? (y/n): ")
     if choice.lower().startswith('y'):
         for vid in tqdm(reversed(songs), desc="Liking songs", unit="song"):
             while True:
-                resp = ytmusic.rate_song(vid, 'LIKE')
+                resp = try_request(lambda: ytmusic.rate_song(vid, 'LIKE'))
                 text = resp['actions'][0]['addToToastAction']['item']['notificationActionRenderer']['responseText']['runs'][0]['text']
                 if text == 'Saved to liked songs':
                     break
                 sleep(1)
 
-
 def create_all_playlists(playlists, ytmusic):
-    completed = set(p['name'] for p in load_json("completed_playlists.json", []))
-    rem = load_json(REMAINING_FILE, [])
-    queue = rem or list(reversed(playlists))
+    completed = set(p['name'] for p in load_json(COMPLETED_PLAYLISTS_FILE, []))
+    queue = [p for p in reversed(playlists) if p['name'] not in completed]
+
     with tqdm(queue, desc="Creating playlists", unit="playlist") as pbar:
         for pl in queue:
             name = pl['name'].replace('<', '(').replace('>', ')')
             try:
-                ytmusic.create_playlist(name, pl['description'], video_ids=pl['songs'])
+                try_request(lambda: ytmusic.create_playlist(name, pl['description'], video_ids=pl['songs']))
                 if pl['name'].lower().startswith('your spotify likes'):
                     like_all_songs(pl['songs'], ytmusic)
+                completed.add(pl['name'])
+                save_json(COMPLETED_PLAYLISTS_FILE, list(completed))
             except Exception as e:
                 print("Rate limit hit, saving remaining...")
                 save_json(REMAINING_FILE, queue[queue.index(pl):])
                 break
             else:
                 pbar.update(1)
-        else:
-            save_json(REMAINING_FILE, [])
-    # save completed list
     save_json(YT_PLAYLISTS_FILE, playlists)
 
 # ---------- MAIN ----------
 def main():
-    
     print("""
     ███████╗██████╗ ████████╗██████╗ ██╗   ██╗████████╗███╗   ███╗
     ██╔════╝██╔══██╗╚══██╔══╝╚════██╗╚██╗ ██╔╝╚══██╔══╝████╗ ████║
@@ -196,12 +188,11 @@ def main():
     ╚══════╝╚═╝        ╚═╝   ╚══════╝   ╚═╝      ╚═╝   ╚═╝     ╚═╝
     """)
     print("Welcome to SPT2YTM — Spotify to YouTube Music Converter")
-    # YT credentials
+
     if not os.path.isfile(BROWSER_FILE):
         os.system("ytmusicapi browser")
     ytmusic = YTMusic(BROWSER_FILE)
 
-    # Spotify credentials
     creds = load_json(CREDENTIALS_FILE) or {}
     if not creds.get('spotify_client_id'):
         creds['spotify_client_id'] = input("Spotify Client ID: ")
@@ -214,17 +205,14 @@ def main():
         redirect_uri="http://127.0.0.1:3000"
     ))
 
-    # Fetch or load Spotify playlists
     playlists = load_json(SPOTIFY_PLAYLISTS_FILE)
     if not playlists:
         playlists = find_all_spotify_playlists(sp)
         save_json(SPOTIFY_PLAYLISTS_FILE, playlists)
 
-    # Convert and create YT playlists
     yt_playlists = get_all_ytm_ids(playlists, ytmusic)
     create_all_playlists(yt_playlists, ytmusic)
 
-    # Print missing
     missing = load_json(NOT_FOUND_FILE)
     if missing:
         print("\nSongs not found:")
